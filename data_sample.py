@@ -1,27 +1,30 @@
-import datetime
+from datetime import datetime
+from dateutil import parser
 import pandas as pd
+import re
 
 from pathlib import Path  
-filepath = Path('folder/out.csv')  
+filepath = Path('out.csv')  
 filepath.parent.mkdir(parents=True, exist_ok=True)  
 
+def convert_time (string):
+    time = datetime.strptime(string, '%H:%M:%S')
+    return time.hour
 
 
 def random_sample (path):
     #read CSV File
-    data = pd.read_csv(path, usecols= {0,11,12}, parse_dates=['StartDateTime'])       
+    data = pd.read_csv(path, usecols= {0,11,12,14}, parse_dates=['StartDateTime'])    
     df = pd.read_csv(path) #holds original values unchanged
-
-    #drop NA values
-    data = data.dropna()
 
     #use values with duration greater than 60 seconds
     data = data[data['Duration'] > 60.0]
     listSample = [] #list to store the random samples
 
     #creates time and cuts down to just hour (0 - 24)
-    time = pd.Series(data.StartDateTime).dt.hour
-    data.insert(loc=2, column='Hour', value=time)
+    data = data.dropna(subset=['Comment'])
+    data['Comment'] = data['Comment'].str.split().str[2]
+    data['Comment'] = data['Comment'].apply(convert_time)
 
     #loop to generate a list for each hour, then select random data
     '''
@@ -30,14 +33,18 @@ def random_sample (path):
     AM-21 No files
     AM-28 No Files
     '''
-    for i in range (0,31):        #loop for each AudioMoth file
+    num_wwf = 1
+    for i in range (0,36):        #loop for each AudioMoth file
         num = (str) (i) 
-        audioMothList = data[data['AudioMothCode']=='AM-'+num]
-        if audioMothList.empty:   #checks if AM is empty
-                continue
+        if (i <= 30):
+            audioMothList = data[data['AudioMothCode']=='AM-'+num]
         else:
+            audioMothList = data[data['AudioMothCode']=='WWF-'+str(num_wwf)]
+            num_wwf+=1
+
+        if (audioMothList.empty == False):   #checks if AM is empty
             for x in range (0,24):     #loop for each hour of the day
-                hourList = audioMothList[audioMothList['Hour'] == x]
+                hourList = audioMothList[audioMothList['Comment'] == x]
                 if hourList.empty:     #checks if hour is empty
                     continue
                 else:
